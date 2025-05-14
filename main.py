@@ -30,10 +30,12 @@ class MicroscopioApp(tk.Tk):
             self.altezza_rettangolo = screen_height
             self.canvas = tk.Canvas(self, bg="lightgray", width=screen_width, height=screen_height)
         else:
-            print(f"DEBUG: Avvio in modalità finestra massimizzata.")
-            self.state('zoomed') # Avvia la finestra massimizzata
+            print(f"DEBUG: Avvio in modalità finestra a dimensione schermo.")
+            # Forza la modalità normale ma con le dimensioni dello schermo
+            self.geometry(f"{screen_width}x{screen_height}+0+0") # +0+0 per posizionarla all'angolo in alto a sinistra
+            self.state('normal')
 
-            # Calcola le dimensioni del rettangolo 16:9 basate sulla dimensione dello schermo massimizzata
+            # Calcola le dimensioni del rettangolo 16:9 basate sulla dimensione dello schermo
             larghezza_desiderata = int(screen_width * INIZIAL_ZOOM_PERCENTAGE)
             altezza_desiderata = int(larghezza_desiderata * 9 / 16)
 
@@ -53,8 +55,8 @@ class MicroscopioApp(tk.Tk):
         self.pulsante2 = tk.Button(self, text="Pulsante 2")
 
         # Posiziona i pulsanti sotto il rettangolo, occupando la piena larghezza
-        pulsante_altezza = 30
-        spazio_tra_rettangolo_e_pulsanti = 10
+        pulsante_altezza = 50
+        spazio_tra_rettangolo_e_pulsanti = 20
         y_pulsanti = self.altezza_rettangolo + spazio_tra_rettangolo_e_pulsanti
 
         # Posiziona il primo pulsante a sinistra, occupando metà della larghezza
