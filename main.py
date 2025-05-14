@@ -3,18 +3,68 @@ from PIL import Image, ImageTk
 import cv2
 import argparse
 import os
-import time  # Import per i log con timestamp
+import time
 
-class MicroscopioApp:
-    def __init__(self, window, window_title, fullscreen=False, width=None, height=None):
-        self.window = window
-        self.window.title(window_title)
+# --- CONFIGURAZIONE INIZIALE ---
+INIZIAL_ZOOM_PERCENTAGE = 1  # Percentuale della larghezza dello schermo per la dimensione iniziale del feed
+WEBCAM_RESOLUTION_WIDTH = 640
+WEBCAM_RESOLUTION_HEIGHT = 360
+# -----------------------------
+
+class MicroscopioApp(tk.Tk):
+    def __init__(self, window_title, fullscreen=False):
+        super().__init__()
+        self.title(window_title)
         self.fullscreen = fullscreen
+
+        self.larghezza_rettangolo = 0
+        self.altezza_rettangolo = 0
+
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
         if self.fullscreen:
-            self.window.attributes('-fullscreen', True)
+            self.attributes('-fullscreen', True)
             print(f"DEBUG: Avvio in modalità schermo intero.")
+            self.larghezza_rettangolo = screen_width
+            self.altezza_rettangolo = screen_height
+            self.canvas = tk.Canvas(self, bg="lightgray", width=screen_width, height=screen_height)
         else:
-            print(f"DEBUG: Avvio in modalità finestra.")
+            print(f"DEBUG: Avvio in modalità finestra massimizzata.")
+            self.state('zoomed') # Avvia la finestra massimizzata
+
+            # Calcola le dimensioni del rettangolo 16:9 basate sulla dimensione dello schermo massimizzata
+            larghezza_desiderata = int(screen_width * INIZIAL_ZOOM_PERCENTAGE)
+            altezza_desiderata = int(larghezza_desiderata * 9 / 16)
+
+            # Assicurati che l'altezza non superi una certa frazione dell'altezza dello schermo
+            max_altezza_percentuale = 0.7 # Aumentato per lasciare più spazio verticale
+            if altezza_desiderata > screen_height * max_altezza_percentuale:
+                altezza_desiderata = int(screen_height * max_altezza_percentuale)
+                larghezza_desiderata = int(altezza_desiderata * 16 / 9)
+
+            self.larghezza_rettangolo = larghezza_desiderata
+            self.altezza_rettangolo = altezza_desiderata
+            self.canvas = tk.Canvas(self, bg="lightgray", width=self.larghezza_rettangolo, height=self.altezza_rettangolo)
+
+        self.canvas.pack()
+        self.video_label = self.canvas.create_image(self.larghezza_rettangolo // 2, self.altezza_rettangolo // 2, anchor=tk.CENTER)
+        self.pulsante1 = tk.Button(self, text="Pulsante 1")
+        self.pulsante2 = tk.Button(self, text="Pulsante 2")
+
+        # Posiziona i pulsanti sotto il rettangolo, occupando la piena larghezza
+        pulsante_altezza = 30
+        spazio_tra_rettangolo_e_pulsanti = 10
+        y_pulsanti = self.altezza_rettangolo + spazio_tra_rettangolo_e_pulsanti
+
+        # Posiziona il primo pulsante a sinistra, occupando metà della larghezza
+        larghezza_pulsante = screen_width // 2
+        x_pulsante1 = 0
+        self.pulsante1.place(x=x_pulsante1, y=y_pulsanti, width=larghezza_pulsante, height=pulsante_altezza)
+
+        # Posiziona il secondo pulsante a destra, occupando metà della larghezza
+        x_pulsante2 = larghezza_pulsante
+        self.pulsante2.place(x=x_pulsante2, y=y_pulsanti, width=larghezza_pulsante, height=pulsante_altezza)
 
         self.camera_index = 0
         print(f"DEBUG: Tentativo di apertura della webcam con indice {self.camera_index}.")
@@ -22,86 +72,43 @@ class MicroscopioApp:
 
         if not self.cap.isOpened():
             print(f"ERRORE: Impossibile aprire la webcam con indice {self.camera_index}.")
-            self.window.quit()
+            self.quit()
             return
 
         print(f"DEBUG: Webcam aperta con successo.")
 
-        if width is not None and height is not None:
-            print(f"DEBUG: Tentativo di impostare la risoluzione della webcam a {width}x{height}.")
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            print(f"DEBUG: Risoluzione della webcam impostata (richiesta: {width}x{height}, effettiva: {actual_width}x{actual_height}).")
-        else:
-            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            print(f"DEBUG: Risoluzione corrente della webcam: {actual_width}x{actual_height}.")
+        # Forza la risoluzione configurabile della webcam
+        print(f"DEBUG: Tentativo di forzare la risoluzione della webcam a {WEBCAM_RESOLUTION_WIDTH}x{WEBCAM_RESOLUTION_HEIGHT}.")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, WEBCAM_RESOLUTION_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, WEBCAM_RESOLUTION_HEIGHT)
+        actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"DEBUG: Risoluzione della webcam impostata (richiesta: {WEBCAM_RESOLUTION_WIDTH}x{WEBCAM_RESOLUTION_HEIGHT}, effettiva: {actual_width}x{actual_height}).")
 
-        self.canvas = tk.Canvas(window, width=window.winfo_screenwidth(), height=window.winfo_screenheight())
-        self.canvas.pack()
-
-        self.photo = None
         self.update_frame()
 
-        # Pulsante per terminare il programma in basso a destra
-        button_width = 12
-        button_height = 2
-        button_x = window.winfo_screenwidth() - (button_width * 10) - 20
-        button_y = window.winfo_screenheight() - (button_height * 20) - 20
-        self.quit_button = tk.Button(window, text="Termina", command=self.safe_quit,
-                                     width=button_width, height=button_height, font=("Arial", 14))
-        self.quit_button.place(x=button_x, y=button_y)
-        print(f"DEBUG: Pulsante 'Termina' creato in posizione ({button_x}, {button_y}).")
-
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         print(f"DEBUG: Gestore per la chiusura della finestra impostato.")
-        self.window.mainloop()
+        print(f"DEBUG: Loop principale di Tkinter avviato.")
+        self.mainloop()
         print(f"DEBUG: Loop principale di Tkinter terminato.")
 
     def update_frame(self):
-        start_time = time.time()
         ret, frame = self.cap.read()
-        end_time_read = time.time()
-        read_duration = (end_time_read - start_time) * 1000  # in millisecondi
-
         if ret:
-            # Converti il frame OpenCV in un'immagine PIL
             self.cv2_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_img = Image.fromarray(self.cv2_img)
-            img_width, img_height = pil_img.size
-
-            # Ridimensiona l'immagine per adattarla alla finestra/schermo mantenendo le proporzioni
-            screen_width = self.window.winfo_screenwidth()
-            screen_height = self.window.winfo_screenheight()
-
-            width_ratio = screen_width / img_width
-            height_ratio = screen_height / img_height
-
-            if width_ratio > height_ratio:
-                new_width = int(img_width * height_ratio)
-                new_height = screen_height
-            else:
-                new_width = screen_width
-                new_height = int(img_height * width_ratio)
-
-            resized_img = pil_img.resize((new_width, new_height))
+            # Ridimensiona l'immagine alla dimensione fissa del rettangolo
+            resized_img = pil_img.resize((self.larghezza_rettangolo, self.altezza_rettangolo))
             self.photo = ImageTk.PhotoImage(resized_img)
-            self.canvas.create_image(screen_width // 2, screen_height // 2, image=self.photo, anchor=tk.CENTER)
-            end_time_display = time.time()
-            display_duration = (end_time_display - end_time_read) * 1000  # in millisecondi
-            # print(f"DEBUG: Frame aggiornato (lettura: {read_duration:.2f}ms, display: {display_duration:.2f}ms, risoluzione originale: {img_width}x{img_height}, ridimensionata a: {new_width}x{new_height}).")
-            self.window.after(30, self.update_frame)  # Aggiorna ogni 30 millisecondi
-        else:
-            print(f"AVVISO: Nessun frame letto dalla webcam. Riprovo.")
-            self.window.after(30, self.update_frame)
+            self.canvas.itemconfig(self.video_label, image=self.photo)
+        self.after(30, self.update_frame)
 
     def safe_quit(self):
         print(f"DEBUG: Richiesta di terminazione sicura del programma.")
         self.cap.release()
         print(f"DEBUG: Risorsa webcam rilasciata.")
-        self.window.destroy()
+        self.destroy()
         print(f"DEBUG: Finestra distrutta.")
 
     def on_closing(self):
@@ -109,11 +116,8 @@ class MicroscopioApp:
         self.safe_quit()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Visualizza il feed del microscopio con opzioni di fullscreen e risoluzione.")
+    parser = argparse.ArgumentParser(description="Visualizza il feed del microscopio.")
     parser.add_argument("--fullscreen", action="store_true", help="Avvia l'applicazione a schermo intero.")
-    parser.add_argument("--width", type=int, help="Forza la larghezza della risoluzione della webcam.")
-    parser.add_argument("--height", type=int, help="Forza l'altezza della risoluzione della webcam.")
     args = parser.parse_args()
 
-    root = tk.Tk()
-    app = MicroscopioApp(root, "Microscopio", fullscreen=args.fullscreen, width=args.width, height=args.height)
+    app = MicroscopioApp("Microscopio", fullscreen=args.fullscreen)
