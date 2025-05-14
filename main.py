@@ -7,8 +7,7 @@ import time
 
 # --- CONFIGURAZIONE INIZIALE ---
 INIZIAL_ZOOM_PERCENTAGE = 1  # Percentuale della larghezza dello schermo per la dimensione iniziale del feed
-WEBCAM_RESOLUTION_WIDTH = 640
-WEBCAM_RESOLUTION_HEIGHT = 360
+WEBCAM_RESOLUTION_HORIZONTAL = 1280
 # -----------------------------
 
 class MicroscopioApp(tk.Tk):
@@ -52,7 +51,7 @@ class MicroscopioApp(tk.Tk):
         self.canvas.pack()
         self.video_label = self.canvas.create_image(self.larghezza_rettangolo // 2, self.altezza_rettangolo // 2, anchor=tk.CENTER)
         self.pulsante1 = tk.Button(self, text="Pulsante 1")
-        self.pulsante2 = tk.Button(self, text="Pulsante 2")
+        self.pulsante2 = tk.Button(self, text="Termina", command=self.safe_quit) # Assegna il comando al pulsante2
 
         # Posiziona i pulsanti sotto il rettangolo, occupando la piena larghezza
         pulsante_altezza = 50
@@ -79,13 +78,14 @@ class MicroscopioApp(tk.Tk):
 
         print(f"DEBUG: Webcam aperta con successo.")
 
-        # Forza la risoluzione configurabile della webcam
-        print(f"DEBUG: Tentativo di forzare la risoluzione della webcam a {WEBCAM_RESOLUTION_WIDTH}x{WEBCAM_RESOLUTION_HEIGHT}.")
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, WEBCAM_RESOLUTION_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, WEBCAM_RESOLUTION_HEIGHT)
+        # Calcola automaticamente la risoluzione verticale della webcam
+        webcam_resolution_vertical = int(WEBCAM_RESOLUTION_HORIZONTAL * 9 / 16)
+        print(f"DEBUG: Tentativo di forzare la risoluzione della webcam a {WEBCAM_RESOLUTION_HORIZONTAL}x{webcam_resolution_vertical}.")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, WEBCAM_RESOLUTION_HORIZONTAL)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_resolution_vertical)
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"DEBUG: Risoluzione della webcam impostata (richiesta: {WEBCAM_RESOLUTION_WIDTH}x{WEBCAM_RESOLUTION_HEIGHT}, effettiva: {actual_width}x{actual_height}).")
+        print(f"DEBUG: Risoluzione della webcam impostata (richiesta: {WEBCAM_RESOLUTION_HORIZONTAL}x{webcam_resolution_vertical}, effettiva: {actual_width}x{actual_height}).")
 
         self.update_frame()
 
