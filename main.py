@@ -1,7 +1,6 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import cv2
-import subprocess
 import argparse
 import os
 import time  # Import per i log con timestamp
@@ -46,15 +45,15 @@ class MicroscopioApp:
         self.photo = None
         self.update_frame()
 
-        # Pulsante di spegnimento in basso a destra (sempre presente)
-        button_width = 10
+        # Pulsante per terminare il programma in basso a destra
+        button_width = 12
         button_height = 2
         button_x = window.winfo_screenwidth() - (button_width * 10) - 20
         button_y = window.winfo_screenheight() - (button_height * 20) - 20
-        self.shutdown_button = tk.Button(window, text="Spegni", command=self.show_shutdown_popup,
-                                          width=button_width, height=button_height, font=("Arial", 14))
-        self.shutdown_button.place(x=button_x, y=button_y)
-        print(f"DEBUG: Pulsante di spegnimento creato in posizione ({button_x}, {button_y}).")
+        self.quit_button = tk.Button(window, text="Termina", command=self.safe_quit,
+                                     width=button_width, height=button_height, font=("Arial", 14))
+        self.quit_button.place(x=button_x, y=button_y)
+        print(f"DEBUG: Pulsante 'Termina' creato in posizione ({button_x}, {button_y}).")
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         print(f"DEBUG: Gestore per la chiusura della finestra impostato.")
@@ -92,37 +91,22 @@ class MicroscopioApp:
             self.canvas.create_image(screen_width // 2, screen_height // 2, image=self.photo, anchor=tk.CENTER)
             end_time_display = time.time()
             display_duration = (end_time_display - end_time_read) * 1000  # in millisecondi
-            print(f"DEBUG: Frame aggiornato (lettura: {read_duration:.2f}ms, display: {display_duration:.2f}ms, risoluzione originale: {img_width}x{img_height}, ridimensionata a: {new_width}x{new_height}).")
+            # print(f"DEBUG: Frame aggiornato (lettura: {read_duration:.2f}ms, display: {display_duration:.2f}ms, risoluzione originale: {img_width}x{img_height}, ridimensionata a: {new_width}x{new_height}).")
             self.window.after(30, self.update_frame)  # Aggiorna ogni 30 millisecondi
         else:
             print(f"AVVISO: Nessun frame letto dalla webcam. Riprovo.")
             self.window.after(30, self.update_frame)
 
-    def show_shutdown_popup(self):
-        print(f"DEBUG: Mostro il popup di conferma per lo spegnimento.")
-        popup = tk.Toplevel(self.window)
-        popup.title("Conferma Spegnimento")
-        label = tk.Label(popup, text="Sei sicuro di voler spegnere il sistema?")
-        label.pack(padx=20, pady=10)
-        confirm_button = tk.Button(popup, text="Sì, Spegni", command=self.shutdown_system)
-        confirm_button.pack(pady=5)
-        cancel_button = tk.Button(popup, text="Annulla", command=popup.destroy)
-        cancel_button.pack(pady=5)
-        print(f"DEBUG: Popup di conferma creato.")
-
-    def shutdown_system(self):
-        print(f"DEBUG: Richiesta di spegnimento del sistema.")
-        self.cap.release()
-        print(f"DEBUG: Risorsa webcam rilasciata.")
-        subprocess.run(["sudo", "shutdown", "-h", "now"])
-        print(f"DEBUG: Comando di spegnimento eseguito.")
-
-    def on_closing(self):
-        print(f"DEBUG: Chiusura della finestra rilevata.")
+    def safe_quit(self):
+        print(f"DEBUG: Richiesta di terminazione sicura del programma.")
         self.cap.release()
         print(f"DEBUG: Risorsa webcam rilasciata.")
         self.window.destroy()
         print(f"DEBUG: Finestra distrutta.")
+
+    def on_closing(self):
+        print(f"DEBUG: Chiusura della finestra rilevata.")
+        self.safe_quit()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualizza il feed del microscopio con opzioni di fullscreen e risoluzione.")
